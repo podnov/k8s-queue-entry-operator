@@ -1,0 +1,42 @@
+# mysql> show create table queue_test;
+# +------------+---------------------------------+
+# | Table      | Create Table                    |
+# +------------+---------------------------------+
+# | queue_test | CREATE TABLE `queue_test` (
+#   `id` int(11) NOT NULL,
+#   `complete` tinyint(1) DEFAULT '0',
+#   PRIMARY KEY (`id`)
+# ) ENGINE=InnoDB DEFAULT CHARSET=utf8 |
+# +------------+---------------------------------+
+# 1 row in set (0.00 sec)
+
+---
+apiVersion: "queueentryoperator.evanzeimet.com/betav1"
+kind: DbQueue
+metadata:
+  name: db-queue-test
+  namespace: queo
+spec:
+  dbDriver: mysql
+  dbDsnSecretKeyRef:
+    key: "db.dev.url"
+    name: queo
+  entriesSql: "select id from queue_test where complete = false"
+  entriesPerSecond: 1
+  entryCapacity: 5
+  jobEntryKeyEnvVarName: QUEUE_TEST_ENTRY_KEY
+  pollIntervalSeconds: 30
+  scope: dev
+  suspend: false
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: queue-test-executor
+            image: alpine
+            command:
+            - echo
+            - "do-something-with"
+            - "$(QUEUE_TEST_ENTRY_KEY)"
+            - "and-mark-it-complete-in-the-db"

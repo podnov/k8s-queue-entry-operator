@@ -1,0 +1,218 @@
+{
+    "apiVersion": "sba.mans.cdw.com/betav1",
+    "kind": "TaskType",
+    "metadata": {
+        "annotations": {
+            "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"sba.mans.cdw.com/betav1\",\"kind\":\"TaskType\",\"metadata\":{\"annotations\":{},\"labels\":{\"app\":\"sba\",\"component\":\"start-vm-build\",\"env\":\"dev\",\"version\":\"0.3.9-SNAPSHOT1\"},\"name\":\"start-vm-build-dev\",\"namespace\":\"sba\"},\"spec\":{\"autoBuildType\":\"build_vm\",\"jobTemplate\":{\"spec\":{\"activeDeadlineSeconds\":3600,\"template\":{\"spec\":{\"containers\":[{\"command\":[\"/sba/bin/sba-workflow\",\"start-vm-build\"],\"env\":[{\"name\":\"CDW_MANS_BMN_SSH_KEY_FILE\",\"value\":\"/sba/bmn.ssh-key\"},{\"name\":\"CDW_MANS_BMNPF_DB_URL\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"bmnpf-db.url\",\"name\":\"sba\"}}},{\"name\":\"CDW_MANS_BUILD_AUTOMATION_UCSD_REQUEST_KEY\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"ucsd.request-key\",\"name\":\"sba\"}}},{\"name\":\"CDW_MANS_CMDB_LOGICAL_NAME\",\"value\":\"DCAPPS-SMTAP-JOBS-DEV\"},{\"name\":\"CDW_MANS_NODE_NAME\",\"valueFrom\":{\"fieldRef\":{\"apiVersion\":\"v1\",\"fieldPath\":\"spec.nodeName\"}}},{\"name\":\"CDW_MANS_POD_NAME\",\"valueFrom\":{\"fieldRef\":{\"apiVersion\":\"v1\",\"fieldPath\":\"metadata.name\"}}},{\"name\":\"CDW_MANS_SILO_INSECURE_SKIP_VERIFY\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"silo.dev.api.insecure-skip-verify\",\"name\":\"sba\"}}},{\"name\":\"CDW_MANS_SILO_PASSWORD\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"silo.dev.api.password\",\"name\":\"sba\"}}},{\"name\":\"CDW_MANS_SILO_USERNAME\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"silo.dev.api.username\",\"name\":\"sba\"}}},{\"name\":\"CDW_MANS_SMTAP_DB_DSN\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"smtap.db.dev.url\",\"name\":\"sba\"}}},{\"name\":\"CDW_MANS_SNOW_BASE_URL\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"snow.dev.api.base-url\",\"name\":\"sba\"}}},{\"name\":\"CDW_MANS_SNOW_PASSWORD\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"snow.api.password\",\"name\":\"sba\"}}},{\"name\":\"CYBERARK_PASS\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"cyberark.dev.password\",\"name\":\"sba\"}}},{\"name\":\"CYBERARK_PIM_BASE_URL\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"cyberark.dev.pim.base-url\",\"name\":\"sba\"}}},{\"name\":\"CYBERARK_USER\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"cyberark.dev.user\",\"name\":\"sba\"}}}],\"image\":\"docker-release-local.vm-vcs-msn-1.binc.net/cdw-mans/sba_workflow_cli:0.3.9-SNAPSHOT1\",\"name\":\"sba\",\"resources\":{\"limits\":{\"memory\":\"512M\"}},\"volumeMounts\":[{\"mountPath\":\"/sba/bmn.ssh-key\",\"name\":\"sba\",\"subPath\":\"bmn.ssh-key\"}]}],\"hostAliases\":[{\"hostnames\":[\"silodev.services.cdw.com\"],\"ip\":\"192.168.53.20\"},{\"hostnames\":[\"vaultdev.services.cdw.com\"],\"ip\":\"192.168.42.144\"},{\"hostnames\":[\"vm-vcs-msn-1.binc.net\"],\"ip\":\"192.168.52.24\"}],\"restartPolicy\":\"OnFailure\",\"volumes\":[{\"name\":\"sba\",\"secret\":{\"defaultMode\":420,\"secretName\":\"sba\"}}]}}}},\"scope\":\"dev\",\"suspend\":false}}\n"
+        },
+        "clusterName": "",
+        "creationTimestamp": "2018-04-11T16:47:20Z",
+        "deletionGracePeriodSeconds": null,
+        "deletionTimestamp": null,
+        "generation": 0,
+        "labels": {
+            "app": "sba",
+            "component": "start-vm-build",
+            "env": "dev",
+            "version": "0.3.9-SNAPSHOT1"
+        },
+        "name": "start-vm-build-dev",
+        "namespace": "sba",
+        "resourceVersion": "294491001",
+        "selfLink": "/apis/sba.mans.cdw.com/betav1/namespaces/sba/sbatasktypes/start-vm-build-dev",
+        "uid": "006afc8d-3da8-11e8-8354-005056977437"
+    },
+    "spec": {
+        "autoBuildType": "build_vm",
+        "jobTemplate": {
+            "spec": {
+                "activeDeadlineSeconds": 3600,
+                "template": {
+                    "spec": {
+                        "containers": [
+                            {
+                                "command": [
+                                    "/sba/bin/sba-workflow",
+                                    "start-vm-build"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "CDW_MANS_BMN_SSH_KEY_FILE",
+                                        "value": "/sba/bmn.ssh-key"
+                                    },
+                                    {
+                                        "name": "CDW_MANS_BMNPF_DB_URL",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "key": "bmnpf-db.url",
+                                                "name": "sba"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "CDW_MANS_BUILD_AUTOMATION_UCSD_REQUEST_KEY",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "key": "ucsd.request-key",
+                                                "name": "sba"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "CDW_MANS_CMDB_LOGICAL_NAME",
+                                        "value": "DCAPPS-SMTAP-JOBS-DEV"
+                                    },
+                                    {
+                                        "name": "CDW_MANS_NODE_NAME",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "spec.nodeName"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "CDW_MANS_POD_NAME",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.name"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "CDW_MANS_SILO_INSECURE_SKIP_VERIFY",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "key": "silo.dev.api.insecure-skip-verify",
+                                                "name": "sba"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "CDW_MANS_SILO_PASSWORD",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "key": "silo.dev.api.password",
+                                                "name": "sba"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "CDW_MANS_SILO_USERNAME",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "key": "silo.dev.api.username",
+                                                "name": "sba"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "CDW_MANS_SMTAP_DB_DSN",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "key": "smtap.db.dev.url",
+                                                "name": "sba"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "CDW_MANS_SNOW_BASE_URL",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "key": "snow.dev.api.base-url",
+                                                "name": "sba"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "CDW_MANS_SNOW_PASSWORD",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "key": "snow.api.password",
+                                                "name": "sba"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "CYBERARK_PASS",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "key": "cyberark.dev.password",
+                                                "name": "sba"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "CYBERARK_PIM_BASE_URL",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "key": "cyberark.dev.pim.base-url",
+                                                "name": "sba"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "CYBERARK_USER",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "key": "cyberark.dev.user",
+                                                "name": "sba"
+                                            }
+                                        }
+                                    }
+                                ],
+                                "image": "docker-release-local.vm-vcs-msn-1.binc.net/cdw-mans/sba_workflow_cli:0.3.9-SNAPSHOT1",
+                                "name": "sba",
+                                "resources": {
+                                    "limits": {
+                                        "memory": "512M"
+                                    }
+                                },
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/sba/bmn.ssh-key",
+                                        "name": "sba",
+                                        "subPath": "bmn.ssh-key"
+                                    }
+                                ]
+                            }
+                        ],
+                        "hostAliases": [
+                            {
+                                "hostnames": [
+                                    "silodev.services.cdw.com"
+                                ],
+                                "ip": "192.168.53.20"
+                            },
+                            {
+                                "hostnames": [
+                                    "vaultdev.services.cdw.com"
+                                ],
+                                "ip": "192.168.42.144"
+                            },
+                            {
+                                "hostnames": [
+                                    "vm-vcs-msn-1.binc.net"
+                                ],
+                                "ip": "192.168.52.24"
+                            }
+                        ],
+                        "restartPolicy": "OnFailure",
+                        "volumes": [
+                            {
+                                "name": "sba",
+                                "secret": {
+                                    "defaultMode": 420,
+                                    "secretName": "sba"
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        "scope": "dev",
+        "suspend": false
+    }
+}
