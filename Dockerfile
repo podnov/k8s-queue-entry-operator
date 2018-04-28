@@ -1,15 +1,9 @@
-FROM golang:1.9-alpine
+FROM ubuntu:latest
+RUN useradd -u 10001 scratchuser
 
-MAINTAINER Evan Zeimet <podnov@gmail.com>
+FROM scratch
+COPY --from=0 /etc/passwd /etc/passwd
+ADD main /
+USER scratchuser
+CMD ["/main"]
 
-RUN addgroup -S queo \
-    && adduser -S -G queo queo \
-    && mkdir /home/queo/bin \
-    && chown queo:queo /home/queo/bin
-
-USER queo
-
-COPY k8s-queue-entry-operator /home/queo/bin/
-WORKDIR /home/queo
-
-CMD /home/queo/bin/k8s-queue-entry-operator
