@@ -117,7 +117,7 @@ func (w *QueueWorker) processNextQueueEntry() bool {
 		return false
 	}
 
-	queueWorkerKey := GetQueueWorkerKey(w.queueResource)
+	queueWorkerKey := GetQueueWorkerKey(w)
 
 	w.infof("Checking for [%s] queue entries", queueWorkerKey)
 	obj, shutdown := w.workqueue.Get()
@@ -151,7 +151,7 @@ func (w *QueueWorker) processNextQueueEntry() bool {
 }
 
 func (w *QueueWorker) queueEntries() {
-	queueWorkerKey := GetQueueWorkerKey(w.queueResource)
+	queueWorkerKey := GetQueueWorkerKey(w)
 	w.infof("Fetching queue entries for [%s]", queueWorkerKey)
 
 	entryKeys, err := w.queueProvider.GetQueueEntryKeys()
@@ -164,7 +164,7 @@ func (w *QueueWorker) queueEntries() {
 }
 
 func (w *QueueWorker) queueEntryKeys(entryKeys []string) {
-	queueWorkerKey := GetQueueWorkerKey(w.queueResource)
+	queueWorkerKey := GetQueueWorkerKey(w)
 	entryCount := len(entryKeys)
 	w.infof("Found [%v] queue entries for [%s]", entryCount, queueWorkerKey)
 

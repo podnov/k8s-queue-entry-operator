@@ -21,10 +21,6 @@ func (q *DbQueue) GetJobTemplate() *v1beta1.JobTemplateSpec {
 	return &q.Spec.JobTemplate
 }
 
-func (q *DbQueue) GetKind() string {
-	return q.Kind
-}
-
 func (q *DbQueue) GetObjectMeta() metav1.ObjectMeta {
 	return q.ObjectMeta
 }

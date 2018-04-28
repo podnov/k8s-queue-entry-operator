@@ -38,7 +38,6 @@ type Queue interface {
 	GetEntryCapacity() int64
 	GetJobEntryKeyEnvVarName() string
 	GetJobTemplate() *v1beta1.JobTemplateSpec
-	GetKind() string
 	GetObjectMeta() metav1.ObjectMeta
 	GetPollIntervalSeconds() int
 	GetScope() string

@@ -8,6 +8,7 @@ import (
 	"github.com/podnov/k8s-queue-entry-operator/pkg/operator/queueprovider"
 	dbQueueprovider "github.com/podnov/k8s-queue-entry-operator/pkg/operator/queueprovider/db"
 	"github.com/podnov/k8s-queue-entry-operator/pkg/operator/queueworker"
+	opkit "github.com/rook/operator-kit"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -74,22 +75,27 @@ func (o *QueueOperator) handleDbQueueAdd(obj interface{}, queueEntriesPendingJob
 		queueProvider, err := dbQueueprovider.NewDbQueueProvider(o.clientset, dbQueue)
 
 		if err == nil {
-			o.createQueueWorker(dbQueue, queueProvider, queueEntriesPendingJob)
+			o.createQueueWorker(queueentryoperatorApiBetav1.DbQueueResource,
+				dbQueue,
+				queueProvider,
+				queueEntriesPendingJob)
 		} else {
 			glog.Errorf("Could not create db queue provider for [%s/%s]: %s", dbQueue.Namespace, dbQueue.Name, err)
 		}
 	}
 }
 
-func (o *QueueOperator) createQueueWorker(queue queueentryoperatorApiBetav1.Queue,
+func (o *QueueOperator) createQueueWorker(crd opkit.CustomResource,
+	queue queueentryoperatorApiBetav1.Queue,
 	queueProvider queueprovider.QueueProvider,
 	queueEntriesPendingJob map[string]queueworker.QueueEntryInfo) {
 
-	queueWorkerKey := queueworker.GetQueueWorkerKey(queue)
+	queueWorkerKey := queueworker.GetResourceQueueWorkerKey(crd, queue)
 	glog.Infof("Adding queue [%s]", queueWorkerKey)
 
 	queueWorker := queueworker.NewQueueWorker(o.clientset,
 		queueProvider,
+		crd.Kind,
 		queue,
 		o.eventRecorder,
 		o.jobLister,
@@ -111,7 +117,8 @@ func (o *QueueOperator) handleDbQueueDelete(obj interface{}) (result map[string]
 	dbQueue := obj.(*queueentryoperatorApiBetav1.DbQueue)
 
 	if o.isQueueInScope(dbQueue) {
-		queueWorkerKey := queueworker.GetQueueWorkerKey(dbQueue)
+		queueWorkerKey := queueworker.GetResourceQueueWorkerKey(queueentryoperatorApiBetav1.DbQueueResource,
+			dbQueue)
 		queueWorkerInfo, workerExists := o.queueWorkerInfos[queueWorkerKey]
 
 		if workerExists {
