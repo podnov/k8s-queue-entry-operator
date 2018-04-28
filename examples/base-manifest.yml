@@ -30,6 +30,8 @@ spec:
         resources:
           limits:
             memory: 128M
+      securityContext:
+        runAsNonRoot: true
       serviceAccountName: queue-entry-operator
 
 ---
