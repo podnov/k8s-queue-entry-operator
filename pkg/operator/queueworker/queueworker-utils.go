@@ -5,6 +5,7 @@ import (
 	"github.com/juju/ratelimit"
 	queueentryoperatorApiBetav1 "github.com/podnov/k8s-queue-entry-operator/pkg/apis/queueentryoperator/betav1"
 	"github.com/podnov/k8s-queue-entry-operator/pkg/operator/queueprovider"
+	opkit "github.com/rook/operator-kit"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,10 +73,11 @@ func createJobFromTemplate(entryInfo QueueEntryInfo, queue queueentryoperatorApi
 	return result
 }
 
-func GetQueueWorkerKey(queue queueentryoperatorApiBetav1.Queue) string {
-	objectMeta := queue.GetObjectMeta()
+func GetQueueWorkerKey(queueWorker *QueueWorker) string {
+	kind := queueWorker.queueResourceKind
+	queueResource := queueWorker.queueResource
+	objectMeta := queueResource.GetObjectMeta()
 
-	kind := queue.GetKind()
 	namespace := objectMeta.Namespace
 	name := objectMeta.Name
 
@@ -86,12 +88,23 @@ func GetQueueWorkerKeyFromParts(kind string, namespace string, name string) stri
 	return fmt.Sprintf("%s/%s/%s", kind, namespace, name)
 }
 
+func GetResourceQueueWorkerKey(crd opkit.CustomResource, queueResource queueentryoperatorApiBetav1.Queue) string {
+	objectMeta := queueResource.GetObjectMeta()
+
+	kind := crd.Kind
+	namespace := objectMeta.Namespace
+	name := objectMeta.Name
+
+	return GetQueueWorkerKeyFromParts(kind, namespace, name)
+}
+
 func _getUniqueJobValue() int64 {
 	return time.Now().Unix()
 }
 
 func NewQueueWorker(clientset kubernetes.Interface,
 	queueProvider queueprovider.QueueProvider,
+	queueResourceKind string,
 	queueResource queueentryoperatorApiBetav1.Queue,
 	eventRecorder record.EventRecorder,
 	jobLister batchv1Listers.JobLister,
@@ -121,6 +134,7 @@ func NewQueueWorker(clientset kubernetes.Interface,
 		queueEntriesPendingJob: queueEntriesPendingJob,
 		queueProvider:          queueProvider,
 		queueResource:          queueResource,
+		queueResourceKind:      queueResourceKind,
 		scope:                  scope,
 		workqueue:              workqueue,
 	}
