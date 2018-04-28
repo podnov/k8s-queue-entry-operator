@@ -37,6 +37,8 @@ func (w *QueueWorker) DeleteQueueEntryPendingJob(job *batchv1.Job) {
 	if jobMatchesQueueEntry {
 		w.infof("Removing queue entry [%s] pending job [%s/%s]", jobQueueEntryKey, job.Namespace, job.Name)
 		delete(w.queueEntriesPendingJob, jobQueueEntryKey)
+	} else {
+		w.infof("Not removing queue entry [%s], doesn't match current pending jobs", jobQueueEntryKey)
 	}
 }
 
@@ -217,6 +219,7 @@ func (w *QueueWorker) queueEntryKeys(entryKeys []string) {
 
 func (w *QueueWorker) Run(stopCh <-chan struct{}) {
 	w.infof("Starting sub-processes")
+	defer w.workqueue.ShutDown()
 
 	pollIntervalSeconds := w.queueResource.GetPollIntervalSeconds()
 	if pollIntervalSeconds <= 0 {
