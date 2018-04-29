@@ -1,3 +1,5 @@
+# Example database table queue schema:
+#
 # mysql> show create table queue_test;
 # +------------+---------------------------------+
 # | Table      | Create Table                    |
@@ -10,6 +12,7 @@
 # +------------+---------------------------------+
 # 1 row in set (0.00 sec)
 
+# Example dbqueue definition that creates one k8s job per queue entry:
 ---
 apiVersion: "queueentryoperator.evanzeimet.com/betav1"
 kind: DbQueue
@@ -19,7 +22,7 @@ metadata:
 spec:
   dbDriver: mysql
   dbDsnSecretKeyRef:
-    key: "db.dev.url"
+    key: "db.dev.dsn"
     name: queo
   entriesSql: "select id from queue_test where complete = false"
   entriesPerSecond: 1
@@ -41,6 +44,7 @@ spec:
             - "$(QUEUE_TEST_ENTRY_KEY)"
             - "and-mark-it-complete-in-the-db"
 
+# Example dbqueue definition that creates one k8s job for all queue entries
 ---
 apiVersion: "queueentryoperator.evanzeimet.com/betav1"
 kind: DbQueue
@@ -50,11 +54,12 @@ metadata:
 spec:
   dbDriver: mysql
   dbDsnSecretKeyRef:
-    key: "db.dev.url"
+    key: "db.dev.dsn"
     name: queo
   entriesSql: "select id from queue_test where complete = false limit 1"
   entriesPerSecond: 1
   entryCapacity: 1
+  jobEntryKeyEnvVarName: omit
   pollIntervalSeconds: 30
   scope: dev
   suspend: false
@@ -67,4 +72,4 @@ spec:
             image: alpine
             command:
             - echo
-            - "do-something-with-a-non-zero-entry-count-and-mark-them-complete"
+            - "do-something-with-a-non-zero-entry-count-and-mark-them-complete-in-the-db"

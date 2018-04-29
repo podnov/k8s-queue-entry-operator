@@ -36,7 +36,7 @@ func (o *QueueOperator) addDbQueue(obj interface{}, queueEntriesPendingJob map[s
 			glog.Errorf("Could not create db queue provider for [%s]: %s", queueWorkerKey, err)
 		}
 	} else {
-		glog.Infof("Db queue [%s] deleted, not in scope", queueWorkerKey)
+		glog.Infof("Db queue [%s] added but skipped, not in scope", queueWorkerKey)
 	}
 }
 
@@ -137,7 +137,7 @@ func (o *QueueOperator) deleteDbQueue(obj interface{}) (result map[string]queuew
 			glog.Infof("Db queue [%s] deleted, no worker found", queueWorkerKey)
 		}
 	} else {
-		glog.Infof("Db queue [%s] deleted, not in scope", queueWorkerKey)
+		glog.Infof("Db queue [%s] deleted but skipped, not in scope", queueWorkerKey)
 	}
 
 	return result
