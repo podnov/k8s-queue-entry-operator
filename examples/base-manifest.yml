@@ -22,7 +22,7 @@ spec:
         component: queue-entry-operator-dev
     spec:
       containers:
-      - image: docker-release-local.vm-vcs-msn-1.binc.net/podnov/k8s-queue-entry-operator:0.1.0
+      - image: gonna-have-to-build-it-yourself.for.now/k8s-queue-entry-operator:0.1.0
         env:
         - name: K8S_QUEUE_ENTRY_OPERATOR_SCOPE
           value: dev
