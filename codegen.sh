@@ -1,8 +1,6 @@
 #!/bin/bash -e
 
-# Note, the rook operator-kit was using a version of k8s.io/code-generator that has a bug
-# in lister-gen and informer-gen where the main.go for both of those is not calling pflag.Parse()
-# which resulted in InputDirs (--input-dirs) resolving to empty array.
+# built with code-generator a9a9141027a9e4b47e915a91401df91ef7fa583b
 
 deepcopy-gen \
     --input-dirs "github.com/podnov/k8s-queue-entry-operator/pkg/apis/queueentryoperator/betav1" \

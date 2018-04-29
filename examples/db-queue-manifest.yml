@@ -14,7 +14,7 @@
 apiVersion: "queueentryoperator.evanzeimet.com/betav1"
 kind: DbQueue
 metadata:
-  name: db-queue-test
+  name: db-queue-entry-test
   namespace: queo
 spec:
   dbDriver: mysql
@@ -33,10 +33,38 @@ spec:
       template:
         spec:
           containers:
-          - name: queue-test-executor
+          - name: queue-entry-executor
             image: alpine
             command:
             - echo
             - "do-something-with"
             - "$(QUEUE_TEST_ENTRY_KEY)"
             - "and-mark-it-complete-in-the-db"
+
+---
+apiVersion: "queueentryoperator.evanzeimet.com/betav1"
+kind: DbQueue
+metadata:
+  name: db-queue-entries-test
+  namespace: queo
+spec:
+  dbDriver: mysql
+  dbDsnSecretKeyRef:
+    key: "db.dev.url"
+    name: queo
+  entriesSql: "select id from queue_test where complete = false limit 1"
+  entriesPerSecond: 1
+  entryCapacity: 1
+  pollIntervalSeconds: 30
+  scope: dev
+  suspend: false
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: queue-entries-executor
+            image: alpine
+            command:
+            - echo
+            - "do-something-with-a-non-zero-entry-count-and-mark-them-complete"

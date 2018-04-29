@@ -22,6 +22,24 @@ import (
 
 const operatorAgentName = "smtap-queue-operator"
 
+func (o *QueueOperator) addDbQueue(obj interface{}, queueEntriesPendingJob map[string]queueworker.QueueEntryInfo) {
+	dbQueue := obj.(*queueentryoperatorApiBetav1.DbQueue)
+	crd := queueentryoperatorApiBetav1.DbQueueResource
+	queueWorkerKey := queueworker.GetResourceQueueWorkerKey(crd, dbQueue)
+
+	if o.isQueueInScope(dbQueue) {
+		queueProvider, err := dbQueueprovider.NewDbQueueProvider(o.clientset, dbQueue)
+
+		if err == nil {
+			o.createQueueWorker(crd, dbQueue, queueProvider, queueEntriesPendingJob)
+		} else {
+			glog.Errorf("Could not create db queue provider for [%s]: %s", queueWorkerKey, err)
+		}
+	} else {
+		glog.Infof("Db queue [%s] deleted, not in scope", queueWorkerKey)
+	}
+}
+
 func (o *QueueOperator) createDbQueueClients(stopCh <-chan struct{}) {
 	glog.Info("Creating db queue clients")
 
@@ -29,6 +47,18 @@ func (o *QueueOperator) createDbQueueClients(stopCh <-chan struct{}) {
 	go dbQueueInformerFactory.Start(stopCh)
 
 	o.dbQueueInformer = dbQueueInformerFactory.Queueentryoperator().Betav1().DbQueues()
+}
+
+func (o *QueueOperator) createDbQueueEventHandlers() {
+	glog.Info("Setting up db queue event handlers")
+
+	resourceHandlers := cache.ResourceEventHandlerFuncs{
+		AddFunc:    o.handleDbQueueAdd,
+		UpdateFunc: o.handleDbQueueUpdate,
+		DeleteFunc: o.handleDbQueueDelete,
+	}
+
+	o.dbQueueInformer.Informer().AddEventHandler(resourceHandlers)
 }
 
 func (o *QueueOperator) createEventRecorder() {
@@ -50,39 +80,15 @@ func (o *QueueOperator) createJobClients(stopCh <-chan struct{}) {
 	o.jobLister = o.jobInformer.Lister()
 }
 
-func (o *QueueOperator) handleCompletedJob(job *batchv1.Job) {
-	if len(job.OwnerReferences) > 0 {
-		jobOwnerReference := job.OwnerReferences[0]
+func (o *QueueOperator) createJobEventHandlers() {
+	glog.Info("Setting up job event handlers")
 
-		kind := jobOwnerReference.Kind
-		namespace := job.Namespace
-		name := jobOwnerReference.Name
-
-		queueWorkerKey := queueworker.GetQueueWorkerKeyFromParts(kind, namespace, name)
-		queueWorkerInfo, workerExists := o.queueWorkerInfos[queueWorkerKey]
-
-		if workerExists {
-			glog.Infof("Sending completed job to worker [%s]", queueWorkerKey)
-			queueWorkerInfo.queueWorker.DeleteQueueEntryPendingJob(job)
-		}
+	resourceHandlers := cache.ResourceEventHandlerFuncs{
+		UpdateFunc: o.handleJobUpdate,
+		DeleteFunc: o.handleJobDelete,
 	}
-}
 
-func (o *QueueOperator) handleDbQueueAdd(obj interface{}, queueEntriesPendingJob map[string]queueworker.QueueEntryInfo) {
-	dbQueue := obj.(*queueentryoperatorApiBetav1.DbQueue)
-
-	if o.isQueueInScope(dbQueue) {
-		queueProvider, err := dbQueueprovider.NewDbQueueProvider(o.clientset, dbQueue)
-
-		if err == nil {
-			o.createQueueWorker(queueentryoperatorApiBetav1.DbQueueResource,
-				dbQueue,
-				queueProvider,
-				queueEntriesPendingJob)
-		} else {
-			glog.Errorf("Could not create db queue provider for [%s/%s]: %s", dbQueue.Namespace, dbQueue.Name, err)
-		}
-	}
+	o.jobInformer.Informer().AddEventHandler(resourceHandlers)
 }
 
 func (o *QueueOperator) createQueueWorker(crd opkit.CustomResource,
@@ -91,7 +97,7 @@ func (o *QueueOperator) createQueueWorker(crd opkit.CustomResource,
 	queueEntriesPendingJob map[string]queueworker.QueueEntryInfo) {
 
 	queueWorkerKey := queueworker.GetResourceQueueWorkerKey(crd, queue)
-	glog.Infof("Adding queue [%s]", queueWorkerKey)
+	glog.Infof("Adding queue worker [%s]", queueWorkerKey)
 
 	queueWorker := queueworker.NewQueueWorker(o.clientset,
 		queueProvider,
@@ -110,15 +116,15 @@ func (o *QueueOperator) createQueueWorker(crd opkit.CustomResource,
 	}
 
 	o.queueWorkerInfos[queueWorkerKey] = queueWorkerInfo
-	queueWorker.Run(stopCh)
+	go queueWorker.Run(stopCh)
 }
 
-func (o *QueueOperator) handleDbQueueDelete(obj interface{}) (result map[string]queueworker.QueueEntryInfo) {
+func (o *QueueOperator) deleteDbQueue(obj interface{}) (result map[string]queueworker.QueueEntryInfo) {
 	dbQueue := obj.(*queueentryoperatorApiBetav1.DbQueue)
+	queueWorkerKey := queueworker.GetResourceQueueWorkerKey(queueentryoperatorApiBetav1.DbQueueResource,
+		dbQueue)
 
 	if o.isQueueInScope(dbQueue) {
-		queueWorkerKey := queueworker.GetResourceQueueWorkerKey(queueentryoperatorApiBetav1.DbQueueResource,
-			dbQueue)
 		queueWorkerInfo, workerExists := o.queueWorkerInfos[queueWorkerKey]
 
 		if workerExists {
@@ -127,17 +133,47 @@ func (o *QueueOperator) handleDbQueueDelete(obj interface{}) (result map[string]
 			glog.Infof("Removing db queue [%s] from watch list", queueWorkerKey)
 			close(queueWorkerInfo.stopCh)
 			delete(o.queueWorkerInfos, queueWorkerKey)
+		} else {
+			glog.Infof("Db queue [%s] deleted, no worker found", queueWorkerKey)
 		}
+	} else {
+		glog.Infof("Db queue [%s] deleted, not in scope", queueWorkerKey)
 	}
 
 	return result
 }
 
+func (o *QueueOperator) handleCompletedJob(job *batchv1.Job) {
+	if len(job.OwnerReferences) > 0 {
+		jobOwnerReference := job.OwnerReferences[0]
+
+		kind := jobOwnerReference.Kind
+		namespace := job.Namespace
+		name := jobOwnerReference.Name
+
+		queueWorkerKey := queueworker.GetQueueWorkerKeyFromParts(kind, namespace, name)
+		queueWorkerInfo, workerExists := o.queueWorkerInfos[queueWorkerKey]
+
+		if workerExists {
+			glog.Infof("Sending completed job to worker [%s]", queueWorkerKey)
+			queueWorkerInfo.queueWorker.DeleteQueueEntryPendingJob(job)
+		}
+	}
+}
+
+func (o *QueueOperator) handleDbQueueAdd(obj interface{}) {
+	o.addDbQueue(obj, map[string]queueworker.QueueEntryInfo{})
+}
+
+func (o *QueueOperator) handleDbQueueDelete(obj interface{}) {
+	o.deleteDbQueue(obj)
+}
+
 func (o *QueueOperator) handleDbQueueUpdate(oldObj interface{}, newObj interface{}) {
 	changed := diffObjects(oldObj, newObj)
 	if changed {
-		queueEntriesPendingJob := o.handleDbQueueDelete(oldObj)
-		o.handleDbQueueAdd(newObj, queueEntriesPendingJob)
+		queueEntriesPendingJob := o.deleteDbQueue(oldObj)
+		o.addDbQueue(newObj, queueEntriesPendingJob)
 	}
 }
 
@@ -162,15 +198,14 @@ func (o *QueueOperator) Run(stopCh <-chan struct{}) {
 	glog.Info("Initializing operator components")
 	defer runtime.HandleCrash()
 
-	queueentryoperatorScheme.AddToScheme(scheme.Scheme)
-
 	o.createJobClients(stopCh)
 	o.createDbQueueClients(stopCh)
+
+	queueentryoperatorScheme.AddToScheme(scheme.Scheme)
 	o.createEventRecorder()
 
-	glog.Info("Starting k8s api event handlers")
-	o.startDbQueueApiEventHandlers()
-	o.startJobApiEventHandlers()
+	o.createJobEventHandlers()
+	o.createDbQueueEventHandlers()
 
 	glog.Info("Waiting for informer caches to sync")
 	o.waitForInformerCacheSync(stopCh)
@@ -179,34 +214,6 @@ func (o *QueueOperator) Run(stopCh <-chan struct{}) {
 	<-stopCh
 
 	o.stopAllQueueWorkers()
-}
-
-func (o *QueueOperator) startDbQueueApiEventHandlers() {
-	glog.Info("Setting up db queue event handlers")
-
-	resourceHandlers := cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			queueEntriesPendingJob := map[string]queueworker.QueueEntryInfo{}
-			o.handleDbQueueAdd(obj, queueEntriesPendingJob)
-		},
-		UpdateFunc: o.handleDbQueueUpdate,
-		DeleteFunc: func(obj interface{}) {
-			o.handleDbQueueDelete(obj)
-		},
-	}
-
-	o.dbQueueInformer.Informer().AddEventHandler(resourceHandlers)
-}
-
-func (o *QueueOperator) startJobApiEventHandlers() {
-	glog.Info("Setting up job event handlers")
-
-	resourceHandlers := cache.ResourceEventHandlerFuncs{
-		UpdateFunc: o.handleJobUpdate,
-		DeleteFunc: o.handleJobDelete,
-	}
-
-	o.jobInformer.Informer().AddEventHandler(resourceHandlers)
 }
 
 func (o *QueueOperator) stopAllQueueWorkers() {

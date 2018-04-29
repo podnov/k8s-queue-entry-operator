@@ -13,12 +13,10 @@ import (
 var (
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
 	AddToScheme   = SchemeBuilder.AddToScheme
+	Version       = "betav1"
+
+	SchemeGroupVersion = schema.GroupVersion{Group: queueentry.SchemeGroupName, Version: Version}
 )
-
-var Version = "betav1"
-
-// schemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: queueentry.SchemeGroupName, Version: Version}
 
 var DbQueueResource = opkit.CustomResource{
 	Name:    "dbqueue",
