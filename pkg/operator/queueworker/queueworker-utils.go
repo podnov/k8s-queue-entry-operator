@@ -1,9 +1,7 @@
 package queueworker
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/golang/glog"
 	"github.com/juju/ratelimit"
 	queueentryoperatorApiBetav1 "github.com/podnov/k8s-queue-entry-operator/pkg/apis/queueentryoperator/betav1"
 	"github.com/podnov/k8s-queue-entry-operator/pkg/operator/queueprovider"
@@ -64,22 +62,9 @@ func createJobFromTemplate(entryInfo QueueEntryInfo, queue queueentryoperatorApi
 	}
 
 	queueJobConfig := queue.GetJobConfig()
-	bytes, err := json.Marshal(queueJobConfig)
-	if err == nil {
-		glog.Infof("queue config: %s", string(bytes))
-	}
-
 	queueJobConfig.JobTemplate.Spec.DeepCopyInto(&result.Spec)
-	bytes, err = json.Marshal(result.Spec)
-	if err == nil {
-		glog.Infof("result spec: %s", string(bytes))
-	}
 
 	container := &result.Spec.Template.Spec.Containers[0]
-	bytes, err = json.Marshal(container)
-	if err == nil {
-		glog.Infof("container: %s", string(bytes))
-	}
 
 	envVar := corev1.EnvVar{
 		Name:  queueJobConfig.EntryKeyEnvVarName,
