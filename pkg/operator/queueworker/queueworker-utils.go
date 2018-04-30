@@ -1,7 +1,9 @@
 package queueworker
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/golang/glog"
 	"github.com/juju/ratelimit"
 	queueentryoperatorApiBetav1 "github.com/podnov/k8s-queue-entry-operator/pkg/apis/queueentryoperator/betav1"
 	"github.com/podnov/k8s-queue-entry-operator/pkg/operator/queueprovider"
@@ -13,6 +15,7 @@ import (
 	batchv1Listers "k8s.io/client-go/listers/batch/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"sort"
 	"time"
 )
 
@@ -60,15 +63,45 @@ func createJobFromTemplate(entryInfo QueueEntryInfo, queue queueentryoperatorApi
 		},
 	}
 
-	queue.GetJobTemplate().Spec.DeepCopyInto(&result.Spec)
+	queueJobConfig := queue.GetJobConfig()
+	bytes, err := json.Marshal(queueJobConfig)
+	if err == nil {
+		glog.Infof("queue config: %s", string(bytes))
+	}
+
+	queueJobConfig.JobTemplate.Spec.DeepCopyInto(&result.Spec)
+	bytes, err = json.Marshal(result.Spec)
+	if err == nil {
+		glog.Infof("result spec: %s", string(bytes))
+	}
 
 	container := &result.Spec.Template.Spec.Containers[0]
+	bytes, err = json.Marshal(container)
+	if err == nil {
+		glog.Infof("container: %s", string(bytes))
+	}
 
 	envVar := corev1.EnvVar{
-		Name:  queue.GetJobEntryKeyEnvVarName(),
+		Name:  queueJobConfig.EntryKeyEnvVarName,
 		Value: entryKey,
 	}
 	container.Env = append(container.Env, envVar)
+
+	return result
+}
+
+func GetOldestJobs(jobs []batchv1.Job, limit int32) (result []batchv1.Job) {
+	jobCount := len(jobs)
+	oldCount := (jobCount - int(limit))
+
+	if oldCount > 0 {
+		sort.Sort(JobsByStartTime(jobs))
+
+		for jobIndex := 0; jobIndex < oldCount; jobIndex++ {
+			job := jobs[jobIndex]
+			result = append(result, job)
+		}
+	}
 
 	return result
 }

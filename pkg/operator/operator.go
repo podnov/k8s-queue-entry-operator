@@ -8,6 +8,7 @@ import (
 	"github.com/podnov/k8s-queue-entry-operator/pkg/operator/queueprovider"
 	dbQueueprovider "github.com/podnov/k8s-queue-entry-operator/pkg/operator/queueprovider/db"
 	"github.com/podnov/k8s-queue-entry-operator/pkg/operator/queueworker"
+	"github.com/podnov/k8s-queue-entry-operator/pkg/operator/utils"
 	opkit "github.com/rook/operator-kit"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -144,7 +145,7 @@ func (o *QueueOperator) deleteDbQueue(obj interface{}) (result map[string]queuew
 }
 
 func (o *QueueOperator) handleCompletedJob(job *batchv1.Job) {
-	if len(job.OwnerReferences) > 0 {
+	if len(job.OwnerReferences) == 1 {
 		jobOwnerReference := job.OwnerReferences[0]
 
 		kind := jobOwnerReference.Kind
@@ -185,7 +186,7 @@ func (o *QueueOperator) handleJobDelete(obj interface{}) {
 func (o *QueueOperator) handleJobUpdate(oldObj interface{}, newObj interface{}) {
 	job := newObj.(*batchv1.Job)
 
-	if job.Status.Active != 1 {
+	if finished, _ := utils.GetJobFinishedStatus(*job); finished {
 		o.handleCompletedJob(job)
 	}
 }
