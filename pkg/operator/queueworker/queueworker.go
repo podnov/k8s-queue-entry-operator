@@ -3,8 +3,10 @@ package queueworker
 import (
 	"fmt"
 	"github.com/golang/glog"
+	"github.com/podnov/k8s-queue-entry-operator/pkg/operator/utils"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -13,6 +15,53 @@ import (
 
 const jobQueueEntryKeyAnnotationKey = "queueentryoperator.evanzeimet.com/queue-entry-key"
 const jobQueueScopeAnnotationKey = "queueentryoperator.evanzeimet.com/queue-scope"
+
+func (w *QueueWorker) cleanUp() {
+	jobConfig := w.queueResource.GetJobConfig()
+
+	failedJobsHistoryLimit := jobConfig.FailedJobsHistoryLimit
+	successfulJobsHistoryLimit := jobConfig.SuccessfulJobsHistoryLimit
+
+	if failedJobsHistoryLimit != nil || successfulJobsHistoryLimit != nil {
+		namespace := w.queueResource.GetObjectMeta().Namespace
+		jobs, err := w.clientset.BatchV1().Jobs(namespace).List(metav1.ListOptions{})
+		if err != nil {
+			runtime.HandleError(fmt.Errorf("Error fetching Jobs: %v", err))
+			return
+		}
+
+		ownedCompletedJobs, ownedFailedJobs := w.getOwnedFinishedJobs(jobs.Items)
+
+		if failedJobsHistoryLimit != nil {
+			w.cleanUpOldestJobs(ownedFailedJobs, *failedJobsHistoryLimit, batchv1.JobFailed)
+		}
+
+		if successfulJobsHistoryLimit != nil {
+			w.cleanUpOldestJobs(ownedCompletedJobs, *successfulJobsHistoryLimit, batchv1.JobComplete)
+		}
+	}
+}
+
+func (w *QueueWorker) cleanUpOldestJobs(jobs []batchv1.Job, limit int32, conditionType batchv1.JobConditionType) {
+	oldestJobs := GetOldestJobs(jobs, limit)
+	oldJobCount := len(oldestJobs)
+
+	if oldJobCount > 0 {
+		w.infof("Cleaning up [%v] of [%v] [%s] jobs for limit [%v]", oldJobCount, len(jobs), conditionType, limit)
+
+		for _, job := range oldestJobs {
+			jobNamespace := job.Namespace
+			jobName := job.Name
+
+			w.infof("Deleting [%s] job [%s/%s]", conditionType, jobNamespace, jobName)
+			err := w.clientset.BatchV1().Jobs(jobNamespace).Delete(jobName, nil)
+
+			if err != nil {
+				w.errorf("Could not delete job [%s/%s]: %s", jobNamespace, jobName, err)
+			}
+		}
+	}
+}
 
 func (w *QueueWorker) createWorkerLogPrefix() string {
 	objectMeta := w.queueResource.GetObjectMeta()
@@ -69,6 +118,33 @@ func (w *QueueWorker) findRecoverableActiveJob(entryKey string) (bool, *batchv1.
 	}
 
 	return found, recoverableJob, nil
+}
+
+func (w *QueueWorker) getOwnedFinishedJobs(jobs []batchv1.Job) (ownedCompletedJobs []batchv1.Job, ownedFailedJobs []batchv1.Job) {
+	for _, job := range jobs {
+		if len(job.OwnerReferences) == 1 {
+			jobOwnerReference := job.OwnerReferences[0]
+
+			jobOwnerKind := jobOwnerReference.Kind
+			jobOwnerNamespace := job.Namespace
+			jobOwnerName := jobOwnerReference.Name
+
+			if jobOwnerKind == w.queueResourceKind &&
+				jobOwnerNamespace == w.queueResource.GetObjectMeta().Namespace &&
+				jobOwnerName == w.queueResource.GetObjectMeta().Name {
+
+				if finished, conditionType := utils.GetJobFinishedStatus(job); finished {
+					if conditionType == batchv1.JobComplete {
+						ownedCompletedJobs = append(ownedCompletedJobs, job)
+					} else if conditionType == batchv1.JobFailed {
+						ownedFailedJobs = append(ownedFailedJobs, job)
+					}
+				}
+			}
+		}
+	}
+
+	return ownedCompletedJobs, ownedFailedJobs
 }
 
 func (w *QueueWorker) GetQueueEntriesPendingJob() map[string]QueueEntryInfo {
@@ -146,7 +222,7 @@ func (w *QueueWorker) processNextQueueEntry() bool {
 		return true
 	}
 
-	w.workqueue.Forget(obj) // TODO move forget to DeleteQueueEntryPendingJob?
+	w.workqueue.Forget(obj)
 	w.infof("Successfully processed [%s] entry [%s]", queueWorkerKey, entryKey)
 
 	return true
@@ -202,10 +278,12 @@ func (w *QueueWorker) queueEntryKeys(entryKeys []string) {
 				}
 			} else {
 				skippedEntryCount++
-				w.errorf("Caught error checking for recoverable job for [%s/%s] with key [%s]",
+				err := fmt.Errorf("[%s] caught error checking for recoverable job for [%s/%s] with key [%s]",
+					queueWorkerKey,
 					queueResourceNamespace,
 					queueResourceName,
 					entryKey)
+				runtime.HandleError(err)
 			}
 
 			w.queueEntriesPendingJob[entryKey] = entryInfo
@@ -229,6 +307,7 @@ func (w *QueueWorker) Run(stopCh <-chan struct{}) {
 
 	go wait.Until(w.queueEntries, pollIntervalDuration*time.Second, stopCh)
 	go wait.Until(w.processAllQueueEntries, time.Second, stopCh)
+	go wait.Until(w.cleanUp, 10*time.Second, stopCh)
 
 	<-stopCh
 }

@@ -27,22 +27,23 @@ spec:
   entriesSql: "select id from queue_test where complete = false"
   entriesPerSecond: 1
   entryCapacity: 5
-  jobEntryKeyEnvVarName: QUEUE_TEST_ENTRY_KEY
   pollIntervalSeconds: 30
   scope: dev
   suspend: false
-  jobTemplate:
-    spec:
-      template:
-        spec:
-          containers:
-          - name: queue-entry-executor
-            image: alpine
-            command:
-            - echo
-            - "do-something-with"
-            - "$(QUEUE_TEST_ENTRY_KEY)"
-            - "and-mark-it-complete-in-the-db"
+  jobConfig:
+    entryKeyEnvVarName: QUEUE_TEST_ENTRY_KEY
+    jobTemplate:
+      spec:
+        template:
+          spec:
+            containers:
+            - name: queue-entry-executor
+              image: alpine
+              command:
+              - echo
+              - "do-something-with"
+              - "$(QUEUE_TEST_ENTRY_KEY)"
+              - "and-mark-it-complete-in-the-db"
 
 # Example dbqueue definition that creates one k8s job for all queue entries
 ---
@@ -59,17 +60,18 @@ spec:
   entriesSql: "select id from queue_test where complete = false limit 1"
   entriesPerSecond: 1
   entryCapacity: 1
-  jobEntryKeyEnvVarName: omit
   pollIntervalSeconds: 30
   scope: dev
   suspend: false
-  jobTemplate:
-    spec:
-      template:
-        spec:
-          containers:
-          - name: queue-entries-executor
-            image: alpine
-            command:
-            - echo
-            - "do-something-with-a-non-zero-entry-count-and-mark-them-complete-in-the-db"
+  jobConfig:
+    entryKeyEnvVarName: omit
+    jobTemplate:
+      spec:
+        template:
+          spec:
+            containers:
+            - name: queue-entries-executor
+              image: alpine
+              command:
+              - echo
+              - "do-something-with-a-non-zero-entry-count-and-mark-them-complete-in-the-db"

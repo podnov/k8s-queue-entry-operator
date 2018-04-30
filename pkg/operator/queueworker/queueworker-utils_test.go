@@ -3,12 +3,14 @@ package queueworker
 import (
 	"encoding/json"
 	queueentryoperatorBetav1 "github.com/podnov/k8s-queue-entry-operator/pkg/apis/queueentryoperator/betav1"
+	"github.com/podnov/k8s-queue-entry-operator/pkg/internal"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"testing"
+	"time"
 )
 
 func Test_getJobFromTemplate(t *testing.T) {
@@ -40,27 +42,29 @@ func Test_getJobFromTemplate(t *testing.T) {
 		},
 		Spec: queueentryoperatorBetav1.DbQueueSpec{
 			QueueSpec: queueentryoperatorBetav1.QueueSpec{
-				EntriesPerSecond:      1,
-				EntryCapacity:         20,
-				JobEntryKeyEnvVarName: "CDW_MANS_SNOW_TASK_SYS_ID",
-				PollIntervalSeconds:   30,
-				Scope:                 "dev",
-				Suspend:               false,
-				JobTemplate: v1beta1.JobTemplateSpec{
-					Spec: batchv1.JobSpec{
-						Template: corev1.PodTemplateSpec{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "given-nested-pod-name",
-								Namespace: "given-nested-pod-namespace",
-							},
-							Spec: corev1.PodSpec{
-								Containers: []corev1.Container{
-									corev1.Container{
-										Name: "given-pod-container-1-name",
-										Env: []corev1.EnvVar{
-											corev1.EnvVar{
-												Name:  "GIVEN_POD_CONTAINER_1_ENV_VAR_1_NAME",
-												Value: "GIVEN_POD_CONTAINER_1_ENV_VAR_1_VALUE",
+				EntriesPerSecond:    1,
+				EntryCapacity:       20,
+				PollIntervalSeconds: 30,
+				Scope:               "dev",
+				Suspend:             false,
+				JobConfig: queueentryoperatorBetav1.QueueJobConfig{
+					EntryKeyEnvVarName: "CDW_MANS_SNOW_TASK_SYS_ID",
+					JobTemplate: v1beta1.JobTemplateSpec{
+						Spec: batchv1.JobSpec{
+							Template: corev1.PodTemplateSpec{
+								ObjectMeta: metav1.ObjectMeta{
+									Name:      "given-nested-pod-name",
+									Namespace: "given-nested-pod-namespace",
+								},
+								Spec: corev1.PodSpec{
+									Containers: []corev1.Container{
+										corev1.Container{
+											Name: "given-pod-container-1-name",
+											Env: []corev1.EnvVar{
+												corev1.EnvVar{
+													Name:  "GIVEN_POD_CONTAINER_1_ENV_VAR_1_NAME",
+													Value: "GIVEN_POD_CONTAINER_1_ENV_VAR_1_VALUE",
+												},
 											},
 										},
 									},
@@ -145,6 +149,111 @@ func Test_getJobFromTemplate(t *testing.T) {
     },
     "status": {}
 }`
+
+	if actualJson != expectedJson {
+		t.Errorf("got: %s, want: %s", actualJson, expectedJson)
+	}
+}
+
+func Test_GetOldestJobs(t *testing.T) {
+	oldestTime := time.Unix(1494342000, 0)
+	secondOldestTime := oldestTime.AddDate(0, 0, 1)
+	newTime := secondOldestTime.AddDate(0, 4, 2)
+
+	oldestJob := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "oldest-job",
+		},
+		Status: batchv1.JobStatus{
+			StartTime: &metav1.Time{Time: oldestTime},
+		},
+	}
+
+	secondOldestJob := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "second-oldest-job",
+		},
+		Status: batchv1.JobStatus{
+			StartTime: &metav1.Time{Time: secondOldestTime},
+		},
+	}
+
+	newerJob := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "newer-job",
+		},
+		Status: batchv1.JobStatus{
+			StartTime: &metav1.Time{Time: newTime},
+		},
+	}
+
+	unstartedJob := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "unstarted-job",
+		},
+		Status: batchv1.JobStatus{
+			StartTime: nil,
+		},
+	}
+
+	givenJobs := []batchv1.Job{
+		unstartedJob,
+		newerJob,
+		secondOldestJob,
+		newerJob,
+		unstartedJob,
+		oldestJob,
+	}
+
+	givenLimit := int32(len(givenJobs) - 2)
+
+	actual := GetOldestJobs(givenJobs, givenLimit)
+
+	actualJson, err := internal.Stringify(actual)
+	if err != nil {
+		t.Error(err)
+	}
+
+	expectedJson := `[
+    {
+        "metadata": {
+            "name": "oldest-job",
+            "creationTimestamp": null
+        },
+        "spec": {
+            "template": {
+                "metadata": {
+                    "creationTimestamp": null
+                },
+                "spec": {
+                    "containers": null
+                }
+            }
+        },
+        "status": {
+            "startTime": "2017-05-09T15:00:00Z"
+        }
+    },
+    {
+        "metadata": {
+            "name": "second-oldest-job",
+            "creationTimestamp": null
+        },
+        "spec": {
+            "template": {
+                "metadata": {
+                    "creationTimestamp": null
+                },
+                "spec": {
+                    "containers": null
+                }
+            }
+        },
+        "status": {
+            "startTime": "2017-05-10T15:00:00Z"
+        }
+    }
+]`
 
 	if actualJson != expectedJson {
 		t.Errorf("got: %s, want: %s", actualJson, expectedJson)

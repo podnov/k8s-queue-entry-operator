@@ -36,20 +36,25 @@ type Queue interface {
 	runtime.Object
 	GetEntriesPerSeconds() float64
 	GetEntryCapacity() int64
-	GetJobEntryKeyEnvVarName() string
-	GetJobTemplate() *v1beta1.JobTemplateSpec
+	GetJobConfig() QueueJobConfig
 	GetObjectMeta() metav1.ObjectMeta
 	GetPollIntervalSeconds() int
 	GetScope() string
 	GetSuspend() bool
 }
 
+type QueueJobConfig struct {
+	FailedJobsHistoryLimit     *int32                  `json:"failedJobsHistoryLimit,omitempty"`
+	EntryKeyEnvVarName         string                  `json:"entryKeyEnvVarName"`
+	JobTemplate                v1beta1.JobTemplateSpec `json:"jobTemplate"`
+	SuccessfulJobsHistoryLimit *int32                  `json:"successfulJobsHistoryLimit,omitempty"`
+}
+
 type QueueSpec struct { // TODO validation
-	EntriesPerSecond      float64                 `json:"entriesPerSecond"`
-	EntryCapacity         int64                   `json:"entryCapacity"`
-	JobEntryKeyEnvVarName string                  `json:"jobEntryKeyEnvVarName"`
-	JobTemplate           v1beta1.JobTemplateSpec `json:"jobTemplate"`
-	PollIntervalSeconds   int                     `json:"pollIntervalSeconds"`
-	Scope                 string                  `json:"scope"`
-	Suspend               bool                    `json:"suspend"`
+	EntriesPerSecond    float64        `json:"entriesPerSecond"`
+	EntryCapacity       int64          `json:"entryCapacity"`
+	JobConfig           QueueJobConfig `json:"jobConfig"`
+	PollIntervalSeconds int            `json:"pollIntervalSeconds"`
+	Scope               string         `json:"scope"`
+	Suspend             bool           `json:"suspend"`
 }
