@@ -75,7 +75,7 @@ func (w *QueueWorker) DeleteQueueEntryPendingJob(job *batchv1.Job) {
 	jobMatchesQueueEntry := false
 
 	if jobQueueEntryKey != "" && w.scope == jobQueueScope {
-		queueEntryInfo, hasPendingJob := w.queueEntriesPendingJob[jobQueueEntryKey]
+		queueEntryInfo, hasPendingJob := w.queuedEntries.hasJob[jobQueueEntryKey]
 
 		if hasPendingJob {
 			// in case an old failed job for the same ticket is updated/deleted
@@ -85,7 +85,7 @@ func (w *QueueWorker) DeleteQueueEntryPendingJob(job *batchv1.Job) {
 
 	if jobMatchesQueueEntry {
 		w.infof("Removing queue entry [%s] pending job [%s/%s]", jobQueueEntryKey, job.Namespace, job.Name)
-		delete(w.queueEntriesPendingJob, jobQueueEntryKey)
+		delete(w.queuedEntries.hasJob, jobQueueEntryKey)
 	} else {
 		w.infof("Not removing queue entry [%s], doesn't match current pending jobs", jobQueueEntryKey)
 	}
@@ -147,8 +147,8 @@ func (w *QueueWorker) getOwnedFinishedJobs(jobs []batchv1.Job) (ownedCompletedJo
 	return ownedCompletedJobs, ownedFailedJobs
 }
 
-func (w *QueueWorker) GetQueueEntriesPendingJob() map[string]QueueEntryInfo {
-	return w.queueEntriesPendingJob
+func (w *QueueWorker) GetQueuedEntries() QueuedEntries {
+	return w.queuedEntries
 }
 
 func (w *QueueWorker) infof(format string, args ...interface{}) {
@@ -162,14 +162,14 @@ func (w *QueueWorker) processAllQueueEntries() {
 }
 
 func (w *QueueWorker) processEntryInfo(entryInfo QueueEntryInfo) error {
+	entryKey := entryInfo.EntryKey
 	resourceNamespace := entryInfo.QueueResourceNamespace
 	resourceName := entryInfo.QueueResourceName
-
 	queueResource := w.queueResource
 
 	if queueResource.GetSuspend() {
 		w.infof("Skipping processing of entry [%s] as [%s/%s] is now marked suspended",
-			entryInfo.EntryKey,
+			entryKey,
 			resourceNamespace,
 			resourceName)
 	} else {
@@ -180,9 +180,12 @@ func (w *QueueWorker) processEntryInfo(entryInfo QueueEntryInfo) error {
 			return err
 		}
 
-		jobName := fmt.Sprintf("%s/%s", job.Namespace, job.Name)
 		entryInfo.JobUid = job.UID
 
+		w.queuedEntries.hasJob[entryKey] = entryInfo
+		delete(w.queuedEntries.needsJob, entryKey)
+
+		jobName := fmt.Sprintf("%s/%s", job.Namespace, job.Name)
 		message := fmt.Sprintf("Created Job [%s]", jobName)
 		w.eventRecorder.Event(queueResource, corev1.EventTypeNormal, "CreatedJob", message)
 	}
@@ -191,7 +194,13 @@ func (w *QueueWorker) processEntryInfo(entryInfo QueueEntryInfo) error {
 }
 
 func (w *QueueWorker) processNextQueueEntry() bool {
-	if int64(len(w.queueEntriesPendingJob)) >= w.queueResource.GetEntryCapacity() {
+	parallelism := 1
+	if w.queueResource.GetParallelism() != nil {
+		parallelism = int(*w.queueResource.GetParallelism())
+	}
+	jobCount := len(w.queuedEntries.hasJob)
+	if jobCount >= parallelism {
+		// w.infof("Job count [%v] at or over parallelism [%v]", jobCount, parallelism)
 		return false
 	}
 
@@ -229,6 +238,7 @@ func (w *QueueWorker) processNextQueueEntry() bool {
 }
 
 func (w *QueueWorker) queueEntries() {
+	// TOOD we lost "suspend" support moving to a queueworker
 	queueWorkerKey := GetQueueWorkerKey(w)
 	w.infof("Fetching queue entries for [%s]", queueWorkerKey)
 
@@ -254,7 +264,8 @@ func (w *QueueWorker) queueEntryKeys(entryKeys []string) {
 	queueResourceNamespace := w.queueResource.GetObjectMeta().Namespace
 
 	for _, entryKey := range entryKeys {
-		if _, isAlreadyPendingJob := w.queueEntriesPendingJob[entryKey]; !isAlreadyPendingJob {
+		notQueued := !w.queuedEntries.isKeyQueued(entryKey)
+		if notQueued {
 			entryInfo := QueueEntryInfo{
 				QueueResourceName:      queueResourceName,
 				QueueResourceNamespace: queueResourceNamespace,
@@ -286,13 +297,13 @@ func (w *QueueWorker) queueEntryKeys(entryKeys []string) {
 				runtime.HandleError(err)
 			}
 
-			w.queueEntriesPendingJob[entryKey] = entryInfo
+			w.queuedEntries.needsJob[entryKey] = entryInfo
 		} else {
 			skippedEntryCount++
 		}
 	}
 
-	w.infof("Queued [%v], recovered [%v], and skipped [%v] entries pending jobs", queuedEntryCount, recoveredEntryCount, skippedEntryCount)
+	w.infof("Queued [%v], recovered [%v], and skipped [%v] entries already queued", queuedEntryCount, recoveredEntryCount, skippedEntryCount)
 }
 
 func (w *QueueWorker) Run(stopCh <-chan struct{}) {

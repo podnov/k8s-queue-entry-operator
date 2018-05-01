@@ -24,6 +24,8 @@ func Test_getJobFromTemplate(t *testing.T) {
 		QueueResourceNamespace: "sba",
 	}
 
+	givenParallelism := int32(20)
+
 	givenDbQueue := &queueentryoperatorBetav1.DbQueue{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "sba-given-dev",
@@ -42,8 +44,7 @@ func Test_getJobFromTemplate(t *testing.T) {
 		},
 		Spec: queueentryoperatorBetav1.DbQueueSpec{
 			QueueSpec: queueentryoperatorBetav1.QueueSpec{
-				EntriesPerSecond:    1,
-				EntryCapacity:       20,
+				Parallelism:         &givenParallelism,
 				PollIntervalSeconds: 30,
 				Scope:               "dev",
 				Suspend:             false,

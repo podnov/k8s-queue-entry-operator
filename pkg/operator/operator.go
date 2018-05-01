@@ -23,7 +23,7 @@ import (
 
 const operatorAgentName = "smtap-queue-operator"
 
-func (o *QueueOperator) addDbQueue(obj interface{}, queueEntriesPendingJob map[string]queueworker.QueueEntryInfo) {
+func (o *QueueOperator) addDbQueue(obj interface{}, queuedEntries queueworker.QueuedEntries) {
 	dbQueue := obj.(*queueentryoperatorApiBetav1.DbQueue)
 	crd := queueentryoperatorApiBetav1.DbQueueResource
 	queueWorkerKey := queueworker.GetResourceQueueWorkerKey(crd, dbQueue)
@@ -32,7 +32,7 @@ func (o *QueueOperator) addDbQueue(obj interface{}, queueEntriesPendingJob map[s
 		queueProvider, err := dbQueueprovider.NewDbQueueProvider(o.clientset, dbQueue)
 
 		if err == nil {
-			o.createQueueWorker(crd, dbQueue, queueProvider, queueEntriesPendingJob)
+			o.createQueueWorker(crd, dbQueue, queueProvider, queuedEntries)
 		} else {
 			glog.Errorf("Could not create db queue provider for [%s]: %s", queueWorkerKey, err)
 		}
@@ -95,7 +95,7 @@ func (o *QueueOperator) createJobEventHandlers() {
 func (o *QueueOperator) createQueueWorker(crd opkit.CustomResource,
 	queue queueentryoperatorApiBetav1.Queue,
 	queueProvider queueprovider.QueueProvider,
-	queueEntriesPendingJob map[string]queueworker.QueueEntryInfo) {
+	queuedEntries queueworker.QueuedEntries) {
 
 	queueWorkerKey := queueworker.GetResourceQueueWorkerKey(crd, queue)
 	glog.Infof("Adding queue worker [%s]", queueWorkerKey)
@@ -107,7 +107,7 @@ func (o *QueueOperator) createQueueWorker(crd opkit.CustomResource,
 		o.eventRecorder,
 		o.jobLister,
 		o.scope,
-		queueEntriesPendingJob)
+		queuedEntries)
 
 	stopCh := make(chan struct{})
 
@@ -120,7 +120,7 @@ func (o *QueueOperator) createQueueWorker(crd opkit.CustomResource,
 	go queueWorker.Run(stopCh)
 }
 
-func (o *QueueOperator) deleteDbQueue(obj interface{}) (result map[string]queueworker.QueueEntryInfo) {
+func (o *QueueOperator) deleteDbQueue(obj interface{}) (result queueworker.QueuedEntries) {
 	dbQueue := obj.(*queueentryoperatorApiBetav1.DbQueue)
 	queueWorkerKey := queueworker.GetResourceQueueWorkerKey(queueentryoperatorApiBetav1.DbQueueResource,
 		dbQueue)
@@ -129,7 +129,7 @@ func (o *QueueOperator) deleteDbQueue(obj interface{}) (result map[string]queuew
 		queueWorkerInfo, workerExists := o.queueWorkerInfos[queueWorkerKey]
 
 		if workerExists {
-			result = queueWorkerInfo.queueWorker.GetQueueEntriesPendingJob()
+			result = queueWorkerInfo.queueWorker.GetQueuedEntries()
 
 			glog.Infof("Removing db queue [%s] from watch list", queueWorkerKey)
 			close(queueWorkerInfo.stopCh)
@@ -163,7 +163,7 @@ func (o *QueueOperator) handleCompletedJob(job *batchv1.Job) {
 }
 
 func (o *QueueOperator) handleDbQueueAdd(obj interface{}) {
-	o.addDbQueue(obj, map[string]queueworker.QueueEntryInfo{})
+	o.addDbQueue(obj, queueworker.NewQueuedEntries())
 }
 
 func (o *QueueOperator) handleDbQueueDelete(obj interface{}) {
@@ -173,8 +173,8 @@ func (o *QueueOperator) handleDbQueueDelete(obj interface{}) {
 func (o *QueueOperator) handleDbQueueUpdate(oldObj interface{}, newObj interface{}) {
 	changed := diffObjects(oldObj, newObj)
 	if changed {
-		queueEntriesPendingJob := o.deleteDbQueue(oldObj)
-		o.addDbQueue(newObj, queueEntriesPendingJob)
+		queuedEntries := o.deleteDbQueue(oldObj)
+		o.addDbQueue(newObj, queuedEntries)
 	}
 }
 

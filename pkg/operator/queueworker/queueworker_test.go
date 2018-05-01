@@ -31,7 +31,7 @@ func setupTest() {
 	}
 }
 
-func Test_DeleteQueueEntryPendingJob_match(t *testing.T) {
+func Test_DeleteQueueEntryPendingJob_hasJob_match(t *testing.T) {
 	givenEntryKey := "given-entry-key"
 	givenJobUid := types.UID("given-job-uid")
 	givenScope := "dev"
@@ -40,11 +40,16 @@ func Test_DeleteQueueEntryPendingJob_match(t *testing.T) {
 		JobUid: givenJobUid,
 	}
 
-	givenQueueEntriesPendingJob := map[string]QueueEntryInfo{
-		givenEntryKey: givenQueueEntryInfo,
+	givenQueuedEntries := QueuedEntries{
+		hasJob: map[string]QueueEntryInfo{
+			givenEntryKey: givenQueueEntryInfo,
+		},
+		needsJob: map[string]QueueEntryInfo{
+			givenEntryKey: givenQueueEntryInfo,
+		},
 	}
 
-	worker.queueEntriesPendingJob = givenQueueEntriesPendingJob
+	worker.queuedEntries = givenQueuedEntries
 	worker.scope = givenScope
 
 	givenJob := &batchv1.Job{
@@ -59,21 +64,86 @@ func Test_DeleteQueueEntryPendingJob_match(t *testing.T) {
 
 	worker.DeleteQueueEntryPendingJob(givenJob)
 
-	_, exists := worker.queueEntriesPendingJob[givenEntryKey]
+	_, actual := worker.queuedEntries.hasJob[givenEntryKey]
+	expected := false
 
-	if exists {
-		t.Errorf("Expected queue entry for key [%s] to not exist", givenEntryKey)
+	if actual != expected {
+		t.Errorf("got: %s, want: %s", actual, expected)
+	}
+
+	_, actual = worker.queuedEntries.needsJob[givenEntryKey]
+	expected = true
+
+	if actual != expected {
+		t.Errorf("got: %s, want: %s", actual, expected)
 	}
 }
 
-func Test_DeleteQueueEntryPendingJob_notPending(t *testing.T) {
+func Test_DeleteQueueEntryPendingJob_hasJob_scopeMismatch(t *testing.T) {
+	givenEntryKey := "given-entry-key"
+	givenJobUid := types.UID("given-job-uid")
+	givenJobScope := "dev"
+	givenWorkerScope := "prod"
+
+	givenQueueEntryInfo := QueueEntryInfo{
+		JobUid: givenJobUid,
+	}
+
+	givenQueuedEntries := QueuedEntries{
+		hasJob: map[string]QueueEntryInfo{
+			givenEntryKey: givenQueueEntryInfo,
+		},
+		needsJob: map[string]QueueEntryInfo{
+			givenEntryKey: givenQueueEntryInfo,
+		},
+	}
+
+	worker.queuedEntries = givenQueuedEntries
+	worker.scope = givenWorkerScope
+
+	givenJob := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: givenJobUid,
+			Annotations: map[string]string{
+				jobQueueEntryKeyAnnotationKey: givenEntryKey,
+				jobQueueScopeAnnotationKey:    givenJobScope,
+			},
+		},
+	}
+
+	worker.DeleteQueueEntryPendingJob(givenJob)
+
+	_, actual := worker.queuedEntries.hasJob[givenEntryKey]
+	expected := true
+
+	if actual != expected {
+		t.Errorf("got: %s, want: %s", actual, expected)
+	}
+
+	_, actual = worker.queuedEntries.needsJob[givenEntryKey]
+	expected = true
+
+	if actual != expected {
+		t.Errorf("got: %s, want: %s", actual, expected)
+	}
+}
+
+func Test_DeleteQueueEntryPendingJob_notHasJob(t *testing.T) {
 	givenEntryKey := "given-entry-key"
 	givenJobUid := types.UID("given-job-uid")
 	givenScope := "dev"
 
-	givenQueueEntriesPendingJob := map[string]QueueEntryInfo{}
+	givenQueueEntryInfo := QueueEntryInfo{
+		JobUid: givenJobUid,
+	}
 
-	worker.queueEntriesPendingJob = givenQueueEntriesPendingJob
+	givenQueuedEntries := QueuedEntries{
+		needsJob: map[string]QueueEntryInfo{
+			givenEntryKey: givenQueueEntryInfo,
+		},
+	}
+
+	worker.queuedEntries = givenQueuedEntries
 	worker.scope = givenScope
 
 	givenJob := &batchv1.Job{
@@ -89,41 +159,12 @@ func Test_DeleteQueueEntryPendingJob_notPending(t *testing.T) {
 	defer internal.ErrorOnPanic(t)
 
 	worker.DeleteQueueEntryPendingJob(givenJob)
-}
 
-func Test_DeleteQueueEntryPendingJob_scopeMismatch(t *testing.T) {
-	givenEntryKey := "given-entry-key"
-	givenJobUid := types.UID("given-job-uid")
-	givenJobScope := "dev"
-	givenWorkerScope := "prod"
+	_, actual := worker.queuedEntries.needsJob[givenEntryKey]
+	expected := true
 
-	givenQueueEntryInfo := QueueEntryInfo{
-		JobUid: givenJobUid,
-	}
-
-	givenQueueEntriesPendingJob := map[string]QueueEntryInfo{
-		givenEntryKey: givenQueueEntryInfo,
-	}
-
-	worker.queueEntriesPendingJob = givenQueueEntriesPendingJob
-	worker.scope = givenWorkerScope
-
-	givenJob := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			UID: givenJobUid,
-			Annotations: map[string]string{
-				jobQueueEntryKeyAnnotationKey: givenEntryKey,
-				jobQueueScopeAnnotationKey:    givenJobScope,
-			},
-		},
-	}
-
-	worker.DeleteQueueEntryPendingJob(givenJob)
-
-	_, exists := worker.queueEntriesPendingJob[givenEntryKey]
-
-	if !exists {
-		t.Errorf("Expected queue entry for key [%s] to exist", givenEntryKey)
+	if actual != expected {
+		t.Errorf("got: %s, want: %s", actual, expected)
 	}
 }
 

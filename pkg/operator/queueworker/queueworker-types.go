@@ -41,6 +41,18 @@ func (j JobsByStartTime) Less(l int, r int) (result bool) {
 	return result
 }
 
+type QueuedEntries struct {
+	hasJob   map[string]QueueEntryInfo
+	needsJob map[string]QueueEntryInfo
+}
+
+func (q QueuedEntries) isKeyQueued(key string) bool {
+	_, hasJob := q.hasJob[key]
+	_, needsJob := q.needsJob[key]
+
+	return hasJob || needsJob
+}
+
 type QueueEntryInfo struct {
 	EntryKey               string
 	JobUid                 types.UID
@@ -49,13 +61,13 @@ type QueueEntryInfo struct {
 }
 
 type QueueWorker struct {
-	clientset              kubernetes.Interface
-	eventRecorder          record.EventRecorder
-	jobLister              batchv1Listers.JobLister
-	queueEntriesPendingJob map[string]QueueEntryInfo
-	queueProvider          queueprovider.QueueProvider
-	queueResource          queueentryoperatorApiBetav1.Queue
-	queueResourceKind      string // need to store kind seperately from the resource per https://github.com/kubernetes/kubernetes/pull/59264#issuecomment-362579495
-	scope                  string
-	workqueue              workqueue.RateLimitingInterface
+	clientset         kubernetes.Interface
+	eventRecorder     record.EventRecorder
+	jobLister         batchv1Listers.JobLister
+	queuedEntries     QueuedEntries
+	queueProvider     queueprovider.QueueProvider
+	queueResource     queueentryoperatorApiBetav1.Queue
+	queueResourceKind string // need to store kind seperately from the resource per https://github.com/kubernetes/kubernetes/pull/59264#issuecomment-362579495
+	scope             string
+	workqueue         workqueue.RateLimitingInterface
 }

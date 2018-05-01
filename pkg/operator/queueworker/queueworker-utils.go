@@ -2,7 +2,6 @@ package queueworker
 
 import (
 	"fmt"
-	"github.com/juju/ratelimit"
 	queueentryoperatorApiBetav1 "github.com/podnov/k8s-queue-entry-operator/pkg/apis/queueentryoperator/betav1"
 	"github.com/podnov/k8s-queue-entry-operator/pkg/operator/queueprovider"
 	opkit "github.com/rook/operator-kit"
@@ -120,6 +119,13 @@ func _getUniqueJobValue() int64 {
 	return time.Now().Unix()
 }
 
+func NewQueuedEntries() QueuedEntries {
+	return QueuedEntries{
+		hasJob:   map[string]QueueEntryInfo{},
+		needsJob: map[string]QueueEntryInfo{},
+	}
+}
+
 func NewQueueWorker(clientset kubernetes.Interface,
 	queueProvider queueprovider.QueueProvider,
 	queueResourceKind string,
@@ -127,33 +133,20 @@ func NewQueueWorker(clientset kubernetes.Interface,
 	eventRecorder record.EventRecorder,
 	jobLister batchv1Listers.JobLister,
 	scope string,
-	queueEntriesPendingJob map[string]QueueEntryInfo) QueueWorker {
+	queuedEntries QueuedEntries) QueueWorker {
 
-	failureRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second)
-
-	entriesPerSecond := queueResource.GetEntriesPerSeconds()
-	capacity := queueResource.GetEntryCapacity()
-
-	bucketRateLimiter := &workqueue.BucketRateLimiter{
-		Bucket: ratelimit.NewBucketWithRate(entriesPerSecond, capacity),
-	}
-
-	rateLimiter := workqueue.NewMaxOfRateLimiter(
-		failureRateLimiter,
-		bucketRateLimiter,
-	)
-
+	rateLimiter := workqueue.DefaultControllerRateLimiter()
 	workqueue := workqueue.NewRateLimitingQueue(rateLimiter)
 
 	return QueueWorker{
-		clientset:              clientset,
-		eventRecorder:          eventRecorder,
-		jobLister:              jobLister,
-		queueEntriesPendingJob: queueEntriesPendingJob,
-		queueProvider:          queueProvider,
-		queueResource:          queueResource,
-		queueResourceKind:      queueResourceKind,
-		scope:                  scope,
-		workqueue:              workqueue,
+		clientset:         clientset,
+		eventRecorder:     eventRecorder,
+		jobLister:         jobLister,
+		queuedEntries:     queuedEntries,
+		queueProvider:     queueProvider,
+		queueResource:     queueResource,
+		queueResourceKind: queueResourceKind,
+		scope:             scope,
+		workqueue:         workqueue,
 	}
 }
