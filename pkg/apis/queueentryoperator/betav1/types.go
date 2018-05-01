@@ -34,10 +34,9 @@ type DbQueueSpec struct { // TODO validation
 
 type Queue interface {
 	runtime.Object
-	GetEntriesPerSeconds() float64
-	GetEntryCapacity() int64
 	GetJobConfig() QueueJobConfig
 	GetObjectMeta() metav1.ObjectMeta
+	GetParallelism() *int32
 	GetPollIntervalSeconds() int
 	GetScope() string
 	GetSuspend() bool
@@ -51,9 +50,8 @@ type QueueJobConfig struct {
 }
 
 type QueueSpec struct { // TODO validation
-	EntriesPerSecond    float64        `json:"entriesPerSecond"`
-	EntryCapacity       int64          `json:"entryCapacity"`
 	JobConfig           QueueJobConfig `json:"jobConfig"`
+	Parallelism         *int32         `json:"parallelism,omitempty"`
 	PollIntervalSeconds int            `json:"pollIntervalSeconds"`
 	Scope               string         `json:"scope"`
 	Suspend             bool           `json:"suspend"`

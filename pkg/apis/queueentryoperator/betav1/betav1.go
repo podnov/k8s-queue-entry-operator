@@ -4,20 +4,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (q *DbQueue) GetEntryCapacity() int64 {
-	return q.Spec.EntryCapacity
-}
-
-func (q *DbQueue) GetEntriesPerSeconds() float64 {
-	return q.Spec.EntriesPerSecond
-}
-
 func (q *DbQueue) GetJobConfig() QueueJobConfig {
 	return q.Spec.JobConfig
 }
 
 func (q *DbQueue) GetObjectMeta() metav1.ObjectMeta {
 	return q.ObjectMeta
+}
+
+func (q *DbQueue) GetParallelism() *int32 {
+	return q.Spec.Parallelism
 }
 
 func (q *DbQueue) GetPollIntervalSeconds() int {
