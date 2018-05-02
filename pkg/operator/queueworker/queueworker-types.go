@@ -9,6 +9,7 @@ import (
 	batchv1Listers "k8s.io/client-go/listers/batch/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"time"
 )
 
 type JobsByStartTime []batchv1.Job
@@ -61,13 +62,14 @@ type QueueEntryInfo struct {
 }
 
 type QueueWorker struct {
-	clientset         kubernetes.Interface
-	eventRecorder     record.EventRecorder
-	jobLister         batchv1Listers.JobLister
-	queuedEntries     QueuedEntries
-	queueProvider     queueprovider.QueueProvider
-	queueResource     queueentryoperatorApiBetav1.Queue
-	queueResourceKind string // need to store kind seperately from the resource per https://github.com/kubernetes/kubernetes/pull/59264#issuecomment-362579495
-	scope             string
-	workqueue         workqueue.RateLimitingInterface
+	clientset                     kubernetes.Interface
+	eventRecorder                 record.EventRecorder
+	jobLister                     batchv1Listers.JobLister
+	nextParallelismReachedLogTime time.Time
+	queuedEntries                 QueuedEntries
+	queueProvider                 queueprovider.QueueProvider
+	queueResource                 queueentryoperatorApiBetav1.Queue
+	queueResourceKind             string // need to store kind seperately from the resource per https://github.com/kubernetes/kubernetes/pull/59264#issuecomment-362579495
+	scope                         string
+	workqueue                     workqueue.RateLimitingInterface
 }

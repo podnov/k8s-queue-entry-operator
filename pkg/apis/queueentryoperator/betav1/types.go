@@ -45,13 +45,13 @@ type Queue interface {
 type QueueJobConfig struct {
 	FailedJobsHistoryLimit     *int32                  `json:"failedJobsHistoryLimit,omitempty"`
 	EntryKeyEnvVarName         string                  `json:"entryKeyEnvVarName"`
+	Parallelism                *int32                  `json:"parallelism,omitempty"`
 	JobTemplate                v1beta1.JobTemplateSpec `json:"jobTemplate"`
 	SuccessfulJobsHistoryLimit *int32                  `json:"successfulJobsHistoryLimit,omitempty"`
 }
 
 type QueueSpec struct { // TODO validation
 	JobConfig           QueueJobConfig `json:"jobConfig"`
-	Parallelism         *int32         `json:"parallelism,omitempty"`
 	PollIntervalSeconds int            `json:"pollIntervalSeconds"`
 	Scope               string         `json:"scope"`
 	Suspend             bool           `json:"suspend"`

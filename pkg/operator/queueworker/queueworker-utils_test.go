@@ -13,6 +13,21 @@ import (
 	"time"
 )
 
+func Test_createSelectorForControllerUid(t *testing.T) {
+	givenObjectMeta := metav1.ObjectMeta{
+		UID: types.UID("given-uid"),
+	}
+
+	actual := createSelectorForControllerUid(givenObjectMeta)
+
+	actualString := actual.String()
+	expectedString := "controller-uid=given-uid"
+
+	if actualString != expectedString {
+		t.Errorf("got: %s, want: %s", actualString, expectedString)
+	}
+}
+
 func Test_getJobFromTemplate(t *testing.T) {
 	getUniqueJobValue = func() int64 {
 		return 24000
@@ -44,12 +59,12 @@ func Test_getJobFromTemplate(t *testing.T) {
 		},
 		Spec: queueentryoperatorBetav1.DbQueueSpec{
 			QueueSpec: queueentryoperatorBetav1.QueueSpec{
-				Parallelism:         &givenParallelism,
 				PollIntervalSeconds: 30,
 				Scope:               "dev",
 				Suspend:             false,
 				JobConfig: queueentryoperatorBetav1.QueueJobConfig{
 					EntryKeyEnvVarName: "CDW_MANS_SNOW_TASK_SYS_ID",
+					Parallelism:        &givenParallelism,
 					JobTemplate: v1beta1.JobTemplateSpec{
 						Spec: batchv1.JobSpec{
 							Template: corev1.PodTemplateSpec{
