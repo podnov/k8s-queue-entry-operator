@@ -13,7 +13,7 @@ func (q *DbQueue) GetObjectMeta() metav1.ObjectMeta {
 }
 
 func (q *DbQueue) GetParallelism() *int32 {
-	return q.Spec.Parallelism
+	return q.Spec.JobConfig.Parallelism
 }
 
 func (q *DbQueue) GetPollIntervalSeconds() int {

@@ -50,15 +50,8 @@ func (w *QueueWorker) cleanUpOldestJobs(jobs []batchv1.Job, limit int32, conditi
 		w.infof("Cleaning up [%v] of [%v] [%s] jobs for limit [%v]", oldJobCount, len(jobs), conditionType, limit)
 
 		for _, job := range oldestJobs {
-			jobNamespace := job.Namespace
-			jobName := job.Name
-
-			w.infof("Deleting [%s] job [%s/%s]", conditionType, jobNamespace, jobName)
-			err := w.clientset.BatchV1().Jobs(jobNamespace).Delete(jobName, nil)
-
-			if err != nil {
-				w.errorf("Could not delete job [%s/%s]: %s", jobNamespace, jobName, err)
-			}
+			w.deleteJobPods(job)
+			w.deleteJob(job, conditionType)
 		}
 	}
 }
@@ -66,6 +59,42 @@ func (w *QueueWorker) cleanUpOldestJobs(jobs []batchv1.Job, limit int32, conditi
 func (w *QueueWorker) createWorkerLogPrefix() string {
 	objectMeta := w.queueResource.GetObjectMeta()
 	return fmt.Sprintf("[%s/%s]: ", objectMeta.Namespace, objectMeta.Name)
+}
+
+func (w *QueueWorker) deleteJob(job batchv1.Job, conditionType batchv1.JobConditionType) {
+	jobNamespace := job.Namespace
+	jobName := job.Name
+
+	w.infof("Deleting [%s] job [%s/%s]", conditionType, jobNamespace, jobName)
+	err := w.clientset.BatchV1().Jobs(jobNamespace).Delete(jobName, nil)
+
+	if err != nil {
+		w.errorf("Could not delete job [%s/%s]: %s", jobNamespace, jobName, err)
+	}
+}
+
+func (w *QueueWorker) deleteJobPods(job batchv1.Job) {
+	labelSelector := createSelectorForControllerUid(job.ObjectMeta)
+
+	jobNamespace := job.Namespace
+	podListOptions := metav1.ListOptions{LabelSelector: labelSelector.String()}
+
+	podList, err := w.clientset.Core().Pods(jobNamespace).List(podListOptions)
+
+	if err == nil {
+		for _, pod := range podList.Items {
+			podNamespace := pod.Namespace
+			podName := pod.Name
+			w.infof("Deleting pod [%s/%s]", pod.Namespace, podName)
+			err := w.clientset.Core().Pods(podNamespace).Delete(podName, nil)
+
+			if err != nil {
+				w.errorf("Could not delete pods [%s/%s]: %s", podNamespace, podName, err)
+			}
+		}
+	} else {
+		w.errorf("Could not list pods for job [%s/%s]", jobNamespace, job.Name)
+	}
 }
 
 func (w *QueueWorker) DeleteQueueEntryPendingJob(job *batchv1.Job) {
@@ -109,7 +138,8 @@ func (w *QueueWorker) findRecoverableActiveJob(entryKey string) (bool, *batchv1.
 	for _, job := range jobs {
 		match := (entryKey == job.Annotations[jobQueueEntryKeyAnnotationKey])
 		match = (match && (w.scope == job.Annotations[jobQueueScopeAnnotationKey]))
-		active := (job.Status.Active == 1)
+
+		active := !utils.GetJobIsFinished(*job)
 
 		if match && active {
 			recoverableJob = job
@@ -198,9 +228,15 @@ func (w *QueueWorker) processNextQueueEntry() bool {
 	if w.queueResource.GetParallelism() != nil {
 		parallelism = int(*w.queueResource.GetParallelism())
 	}
+
 	jobCount := len(w.queuedEntries.hasJob)
 	if jobCount >= parallelism {
-		// w.infof("Job count [%v] at or over parallelism [%v]", jobCount, parallelism)
+		now := time.Now()
+		if now.After(w.nextParallelismReachedLogTime) {
+			w.infof("Job count [%v] at or over parallelism [%v]", jobCount, parallelism)
+			w.nextParallelismReachedLogTime = now.Add(60 * time.Second)
+		}
+
 		return false
 	}
 

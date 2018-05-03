@@ -25,13 +25,12 @@ spec:
     key: "db.dev.dsn"
     name: queo
   entriesSql: "select id from queue_test where complete = false"
-  entriesPerSecond: 1
-  entryCapacity: 5
   pollIntervalSeconds: 30
   scope: dev
   suspend: false
   jobConfig:
     entryKeyEnvVarName: QUEUE_TEST_ENTRY_KEY
+    parallelism: 5
     jobTemplate:
       spec:
         template:

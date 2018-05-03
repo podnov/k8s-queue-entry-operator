@@ -8,6 +8,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	batchv1Listers "k8s.io/client-go/listers/batch/v1"
 	"k8s.io/client-go/tools/record"
@@ -72,6 +73,16 @@ func createJobFromTemplate(entryInfo QueueEntryInfo, queue queueentryoperatorApi
 	container.Env = append(container.Env, envVar)
 
 	return result
+}
+
+func createSelectorForControllerUid(controller metav1.ObjectMeta) labels.Selector {
+	uid := string(controller.UID)
+
+	set := labels.Set{
+		"controller-uid": uid,
+	}
+
+	return labels.SelectorFromSet(set)
 }
 
 func GetOldestJobs(jobs []batchv1.Job, limit int32) (result []batchv1.Job) {
@@ -139,14 +150,15 @@ func NewQueueWorker(clientset kubernetes.Interface,
 	workqueue := workqueue.NewRateLimitingQueue(rateLimiter)
 
 	return QueueWorker{
-		clientset:         clientset,
-		eventRecorder:     eventRecorder,
-		jobLister:         jobLister,
-		queuedEntries:     queuedEntries,
-		queueProvider:     queueProvider,
-		queueResource:     queueResource,
-		queueResourceKind: queueResourceKind,
-		scope:             scope,
-		workqueue:         workqueue,
+		clientset:                     clientset,
+		eventRecorder:                 eventRecorder,
+		jobLister:                     jobLister,
+		nextParallelismReachedLogTime: time.Now(),
+		queuedEntries:                 queuedEntries,
+		queueProvider:                 queueProvider,
+		queueResource:                 queueResource,
+		queueResourceKind:             queueResourceKind,
+		scope:                         scope,
+		workqueue:                     workqueue,
 	}
 }
