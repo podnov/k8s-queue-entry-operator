@@ -1,15 +1,18 @@
 package operator
 
 import (
+	"fmt"
 	"github.com/golang/glog"
 	queueentryoperatorApiBetav1 "github.com/podnov/k8s-queue-entry-operator/pkg/apis/queueentryoperator/betav1"
 	queueentryoperatorScheme "github.com/podnov/k8s-queue-entry-operator/pkg/client/clientset/internalclientset/scheme"
 	queueentryoperatorInformers "github.com/podnov/k8s-queue-entry-operator/pkg/client/informers/informers_generated/externalversions"
+	"github.com/podnov/k8s-queue-entry-operator/pkg/config"
 	"github.com/podnov/k8s-queue-entry-operator/pkg/operator/queueprovider"
 	dbQueueprovider "github.com/podnov/k8s-queue-entry-operator/pkg/operator/queueprovider/db"
 	"github.com/podnov/k8s-queue-entry-operator/pkg/operator/queueworker"
 	"github.com/podnov/k8s-queue-entry-operator/pkg/operator/utils"
 	opkit "github.com/rook/operator-kit"
+	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -195,7 +198,7 @@ func (o *QueueOperator) isQueueInScope(queue queueentryoperatorApiBetav1.Queue) 
 	return o.scope == queue.GetScope()
 }
 
-func (o *QueueOperator) Run(stopCh <-chan struct{}) {
+func (o *QueueOperator) Run(stopCh chan struct{}) {
 	glog.Info("Initializing operator components")
 	defer runtime.HandleCrash()
 
@@ -209,10 +212,14 @@ func (o *QueueOperator) Run(stopCh <-chan struct{}) {
 	o.createDbQueueEventHandlers()
 
 	glog.Info("Waiting for informer caches to sync")
-	o.waitForInformerCacheSync(stopCh)
-	glog.Info("Informer caches synced")
+	err := o.waitForInformerCacheSync(stopCh)
+	if err == nil {
+		glog.Info("Informer caches synced")
 
-	<-stopCh
+		<-stopCh
+	} else {
+		close(stopCh)
+	}
 
 	o.stopAllQueueWorkers()
 }
@@ -223,10 +230,27 @@ func (o *QueueOperator) stopAllQueueWorkers() {
 	}
 }
 
-func (o *QueueOperator) waitForInformerCacheSync(stopCh <-chan struct{}) {
-	jobsSynced := o.jobInformer.Informer().HasSynced
-	dbQueuesSynced := o.dbQueueInformer.Informer().HasSynced
-	if ok := cache.WaitForCacheSync(stopCh, jobsSynced, dbQueuesSynced); !ok {
-		glog.Fatal("Failed to wait for caches to sync")
+func (o *QueueOperator) waitForInformerCacheSync(stopCh <-chan struct{}) (err error) {
+	synced := make(chan bool)
+
+	go func() {
+		jobsSynced := o.jobInformer.Informer().HasSynced
+		dbQueuesSynced := o.dbQueueInformer.Informer().HasSynced
+		if ok := cache.WaitForCacheSync(stopCh, jobsSynced, dbQueuesSynced); !ok {
+			glog.Fatal("Failed to wait for caches to sync")
+		}
+
+		synced <- true
+	}()
+
+	timeoutSeconds := viper.GetInt(config.KeyInformerCacheSyncTimeoutSeconds)
+	timeout := time.Duration(timeoutSeconds) * time.Second
+
+	select {
+	case <-synced:
+	case <-time.After(timeout):
+		err = fmt.Errorf("Timed out after [%v] seconds waiting for informer cache sync", timeoutSeconds)
 	}
+
+	return err
 }

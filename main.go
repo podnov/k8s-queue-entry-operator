@@ -6,8 +6,10 @@ import (
 	"github.com/golang/glog"
 	queueentryoperatorApiBetav1 "github.com/podnov/k8s-queue-entry-operator/pkg/apis/queueentryoperator/betav1"
 	queueentryoperatorClientsetBetav1 "github.com/podnov/k8s-queue-entry-operator/pkg/client/clientset/internalclientset"
+	"github.com/podnov/k8s-queue-entry-operator/pkg/config"
 	"github.com/podnov/k8s-queue-entry-operator/pkg/operator"
 	opkit "github.com/rook/operator-kit"
+	"github.com/spf13/viper"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/kubernetes"
 	rest "k8s.io/client-go/rest"
@@ -18,8 +20,6 @@ import (
 )
 
 var onlyOneSignalHandler = make(chan struct{})
-
-const scopeEnvVarName = "K8S_QUEUE_ENTRY_OPERATOR_SCOPE"
 
 var shutdownSignals = []os.Signal{os.Interrupt, syscall.SIGTERM}
 
@@ -59,10 +59,7 @@ func main() {
 	flag.Lookup("logtostderr").Value.Set("true")
 	flag.Lookup("stderrthreshold").Value.Set("INFO")
 
-	scope := os.Getenv(scopeEnvVarName)
-	if scope == "" {
-		glog.Fatalf("Scope env var [%s] unset", scopeEnvVarName)
-	}
+	scope := viper.GetString(config.KeyScope)
 
 	glog.Info("Creating context")
 	opkitContext, internalClientset, err := createContext()
@@ -92,7 +89,7 @@ func registerCrd(opkitContext *opkit.Context) {
 	}
 }
 
-func setupSignalHandler() <-chan struct{} {
+func setupSignalHandler() chan struct{} {
 	close(onlyOneSignalHandler) // panics when called twice
 
 	result := make(chan struct{})
@@ -102,11 +99,11 @@ func setupSignalHandler() <-chan struct{} {
 	go func() {
 		<-signalCh
 
-		glog.Info("Shutting down k8s-queue-operator")
+		glog.Info("Shutting down k8s-queue-entry-operator")
 		close(result)
 
 		<-signalCh
-		glog.Fatalf("Exiting k8s-queue-operator") // second signal. Exit directly.
+		glog.Fatalf("Exiting k8s-queue-entry-operator") // second signal. Exit directly.
 	}()
 
 	return result
