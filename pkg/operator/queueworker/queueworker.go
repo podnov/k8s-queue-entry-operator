@@ -142,6 +142,7 @@ func (w *QueueWorker) findRecoverableActiveJob(entryKey string) (bool, *batchv1.
 		active := !utils.GetJobIsFinished(*job)
 
 		if match && active {
+			found = true
 			recoverableJob = job
 			break
 		}
