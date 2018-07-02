@@ -218,6 +218,7 @@ func (o *QueueOperator) Run(stopCh chan struct{}) {
 
 		<-stopCh
 	} else {
+		glog.Errorf("Encountered error waiting for informer caches to sync: %s", err)
 		close(stopCh)
 	}
 

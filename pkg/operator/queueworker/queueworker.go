@@ -275,7 +275,7 @@ func (w *QueueWorker) processNextQueueEntry() bool {
 }
 
 func (w *QueueWorker) queueEntries() {
-	// TOOD we lost "suspend" support moving to a queueworker
+	// TODO we lost "suspend" support moving to a queueworker
 	queueWorkerKey := GetQueueWorkerKey(w)
 	w.infof("Fetching queue entries for [%s]", queueWorkerKey)
 

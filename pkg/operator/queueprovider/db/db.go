@@ -13,6 +13,7 @@ func (w DbQueueProvider) GetQueueEntryKeys() ([]string, error) {
 	if err != nil {
 		return []string{}, err
 	}
+	defer db.Close()
 
 	var result []string
 	err = db.Select(&result, spec.EntriesSql)
