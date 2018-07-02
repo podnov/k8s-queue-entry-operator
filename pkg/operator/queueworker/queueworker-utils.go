@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -34,7 +35,7 @@ func createJobFromTemplate(entryInfo QueueEntryInfo, queue queueentryoperatorApi
 	scope := queue.GetScope()
 	queueObjectMeta := queue.GetObjectMeta()
 
-	name := fmt.Sprintf("%s-%s-%d", queueObjectMeta.Name, entryKey, getUniqueJobValue())
+	name := fmt.Sprintf("%s-%s-%d", queueObjectMeta.Name, strings.ToLower(entryKey), getUniqueJobValue())
 
 	annotations := copyAnnotations(queueObjectMeta)
 	annotations[jobQueueEntryKeyAnnotationKey] = entryKey

@@ -13,22 +13,7 @@ import (
 	"time"
 )
 
-func Test_createSelectorForControllerUid(t *testing.T) {
-	givenObjectMeta := metav1.ObjectMeta{
-		UID: types.UID("given-uid"),
-	}
-
-	actual := createSelectorForControllerUid(givenObjectMeta)
-
-	actualString := actual.String()
-	expectedString := "controller-uid=given-uid"
-
-	if actualString != expectedString {
-		t.Errorf("got: %s, want: %s", actualString, expectedString)
-	}
-}
-
-func Test_getJobFromTemplate(t *testing.T) {
+func Test_createJobFromTemplate(t *testing.T) {
 	getUniqueJobValue = func() int64 {
 		return 24000
 	}
@@ -111,7 +96,7 @@ func Test_getJobFromTemplate(t *testing.T) {
 	actualJson := string(actualBytes)
 	expectedJson := `{
     "metadata": {
-        "name": "sba-given-dev-GIVENSYSID042-24000",
+        "name": "sba-given-dev-givensysid042-24000",
         "creationTimestamp": null,
         "labels": {
             "givenlabelkey1": "givenlabelvalue1",
@@ -168,6 +153,21 @@ func Test_getJobFromTemplate(t *testing.T) {
 
 	if actualJson != expectedJson {
 		t.Errorf("got: %s, want: %s", actualJson, expectedJson)
+	}
+}
+
+func Test_createSelectorForControllerUid(t *testing.T) {
+	givenObjectMeta := metav1.ObjectMeta{
+		UID: types.UID("given-uid"),
+	}
+
+	actual := createSelectorForControllerUid(givenObjectMeta)
+
+	actualString := actual.String()
+	expectedString := "controller-uid=given-uid"
+
+	if actualString != expectedString {
+		t.Errorf("got: %s, want: %s", actualString, expectedString)
 	}
 }
 
