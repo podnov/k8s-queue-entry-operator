@@ -275,17 +275,22 @@ func (w *QueueWorker) processNextQueueEntry() bool {
 }
 
 func (w *QueueWorker) queueEntries() {
-	// TODO we lost "suspend" support moving to a queueworker
+	queueResource := w.queueResource
 	queueWorkerKey := GetQueueWorkerKey(w)
-	w.infof("Fetching queue entries for [%s]", queueWorkerKey)
 
-	entryKeys, err := w.queueProvider.GetQueueEntryKeys()
-	if err != nil {
-		runtime.HandleError(err)
-		return
+	if queueResource.GetSuspend() {
+		w.infof("Not fetching queue entries for [%s], suspended", queueWorkerKey)
+	} else {
+		w.infof("Fetching queue entries for [%s]", queueWorkerKey)
+
+		entryKeys, err := w.queueProvider.GetQueueEntryKeys()
+		if err != nil {
+			runtime.HandleError(err)
+			return
+		}
+
+		w.queueEntryKeys(entryKeys)
 	}
-
-	w.queueEntryKeys(entryKeys)
 }
 
 func (w *QueueWorker) queueEntryKeys(entryKeys []string) {
